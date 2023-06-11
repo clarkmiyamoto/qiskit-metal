@@ -1,5 +1,18 @@
-# Installation
+# Todos 
+Note to self: (remove before pushing to qiskit-community/qiskit-metal (main))
 
+<u>Short-term</u>
+- Add support for `config["Solver"]` in `palace_runner.py`
+
+<u>Long-term</u>
+- Add wrapper to run palace software
+- Auto assign boundary conditions to attributes in the .msh file
+
+<u>Unlikely</u>
+- Auto-install Palace
+
+
+# Installation
 To run the `QPalaceRenderer` class in Qiskit Metal. You must install Palace separately. You can find instructions [here](https://awslabs.github.io/palace/stable/install/).
 
 For the University of Southern California's HPC, the following commands installed Palace:
