@@ -6,7 +6,11 @@ from qiskit_metal import Dict
 from qiskit_metal.renderers.renderer_palace.palace_materials import PalaceMaterial 
 
 class PalaceRunner:
-    """Class for generating the config file (JSON) for Palace to run the simulation.
+    """
+    Class for generating the config file (JSON) for simulation settings on Palace.
+
+    Use various properties and methods to change the setup.
+    Then call self.write_config_json to create the JSON file.  
     """
 
     __supported_problem_type__ = ["Eigenmode", 
@@ -27,7 +31,6 @@ class PalaceRunner:
                                          "ZeroCharge",
                                          "Terminal"]
     
-
     def __init__(self):
         self.Problem = Dict()
         self.Model = Dict()
@@ -143,7 +146,6 @@ class PalaceRunner:
     def add_pec(self, attributes: List(int)):
         """Add a Perfect Electrical Conductor (PEC) boundary condition)"""
         self.Boundaries.setdefault("PEC", {"Attributes": []})["Attributes"] += attributes
-
     
     def add_conductivity(self, 
                          attributes: List(int), 
@@ -165,7 +167,6 @@ class PalaceRunner:
                        Conductivity=conductivity,
                        Permeability=permeability,
                        Thickness=thickness)
-
         self.Boundaries.setdefault("Conductivity", []).append(package)
 
     def add_lumped_port(self, 
@@ -262,25 +263,103 @@ class PalaceRunner:
                 they can be specified here.
 
         """
-        package = {
-            "Index": index,
-            "Attributes": attributes,
-            "Side": side,
-            "Thickness": thickness,
-            "Permittivity": permittivity,
-            "PermittivityMA": permittivity_ma,
-            "PermittivityMS": permittivity_ms,
-            "PermittivitySA": permittivity_sa,
-            "LossTan": loss_tan,
-            "Elements": elements
-        }
-
+        package = Dict(
+            Index=index,
+            Attributes=attributes,
+            Side=side,
+            Thickness=thickness,
+            Permittivity=permittivity,
+            PermittivityMA=permittivity_ma,
+            PermittivityMS=permittivity_ms,
+            PermittivitySA=permittivity_sa,
+            LossTan=loss_tan,
+            Elements=elements
+        )
         self.Boundaries.setdefault("Dielectric", []).append(package)
 
+    ##### self.Solver #####
+    def add_eigenmode_solver(self,
+                             target,
+                             tol,
+                             max_its,
+                             N,
+                             save,
+                             solver_type,
+                             contour_target_upper,
+                             contour_aspect_ratio,
+                             contour_n_points):
+        """
+        Add an eigenmode solver.
+
+        Args:
+            target (float, optional): Nonzero frequency target above which to search for eigenvalues, in GHz.
+            tol (float, optional): Relative convergence tolerance for the eigenvalue solver. Defaults to 1.0e-6.
+            max_its (int, optional): Maximum number of iterations for the iterative eigenvalue solver. A value less than 1 uses the solver default.
+            N (int, optional): Number of eigenvalues to compute. Defaults to 1.
+            save (int, optional): Number of computed field modes to save to disk for visualization with ParaView. Files are saved in the paraview/ directory under the directory specified by config["Problem"]["Output"]. Defaults to 0.
+            solver_type (str, optional): Specifies the eigenvalue solver to be used in computing the given number of eigenmodes of the problem. The available options are:
+                - "SLEPc"
+                - "ARPACK"
+                - "FEAST"
+                - "Default": Use the default eigensolver. Currently, this is the Krylov-Schur eigenvalue solver from "SLEPc".
+            contour_target_upper (float, optional): Specifies the upper frequency target of the contour used for the FEAST eigenvalue solver, in GHz. This option is relevant only for type: "FEAST".
+            contour_aspect_ratio (float, optional): Specifies the aspect ratio of the contour used for the FEAST eigenvalue solver. This should be greater than zero, where the aspect ratio is the ratio of the contour width to the frequency range ("contour_target_upper" - "target"). This option is relevant only for type: "FEAST".
+            contour_n_points (int, optional): Number of contour integration points used for the FEAST eigenvalue solver. This option is relevant only for type: "FEAST".
+        """
+        package = dict(
+            Target=target,
+            Tol=tol,
+            MaxIts=max_its,
+            MaxSize=max_size,
+            N=N,
+            Save=save,
+            Type=solver_type,
+            ContourTargetUpper=contour_target_upper,
+            ContourAspectRatio=contour_aspect_ratio,
+            ContourNPoints=contour_n_points
+        )
+        self.Solver.Eigenmode = package
+
+    def create_driven_config(
+        min_freq: float,
+        max_freq: float,
+        freq_step: float,
+        save_step: int,
+        save_only_ports: bool,
+        adaptive_tol: float,
+        adaptive_max_samples: int,
+        adaptive_max_candidates: int,
+        restart: int) -> dict:
+        """
+        Create a configuration dictionary for the "Driven" simulation type.
+
+        Args:
+            min_freq (float): Minimum frequency for the simulation, in Hz.
+            max_freq (float): Maximum frequency for the simulation, in Hz.
+            freq_step (float): Frequency step size, in Hz.
+            save_step (int): Frequency step at which to save results, in number of steps.
+            save_only_ports (bool): Flag indicating whether to save results only for ports.
+            adaptive_tol (float): Tolerance for adaptive sampling.
+            adaptive_max_samples (int): Maximum number of samples for adaptive sampling.
+            adaptive_max_candidates (int): Maximum number of candidates for adaptive sampling.
+            restart (int): Number of restarts for the adaptive solver.
+        """
+        package = {
+            "MinFreq": min_freq,
+            "MaxFreq": max_freq,
+            "FreqStep": freq_step,
+            "SaveStep": save_step,
+            "SaveOnlyPorts": save_only_ports,
+            "AdaptiveTol": adaptive_tol,
+            "AdaptiveMaxSamples": adaptive_max_samples,
+            "AdaptiveMaxCandidates": adaptive_max_candidates,
+            "Restart": restart
+        }
+
+        self.Problem.Driven = package
 
 
-        
-
+    ##### Write config to json #####
     def write_config_json(self, filename: str, sim_dir: str):
         """Write the config.json file for Palace to
         provide the simulation setup.
