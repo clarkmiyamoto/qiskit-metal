@@ -1,19 +1,24 @@
 from typing import Union, Optional
 import os
 import pandas as pd
+import subprocess
 
 from qiskit_metal import Dict, draw
-from qiskit_metal.renderers.renderer_base import QRendererAnalysis
+from qiskit_metal.renderers.renderer_base import QRenderer
 from qiskit_metal.renderers.renderer_gmsh.gmsh_renderer import QGmshRenderer
-from qiskit_metal.renderers.renderer_palace.palace_runner import PalaceRunner
+from qiskit_metal.renderers.renderer_palace.palace_config import PalaceConfig
 
 
-class QPalaceRenderer(QRendererAnalysis):
-    """Extends QRendererAnalysis class and imports meshes from Gmsh using the Palace .json API.
+class QPalaceRenderer(QRenderer):
+    """Extends QRendererAnalysis class and imports meshes from Gmsh using the Palace config.json API.
     """
 
-    name = "palace"
+    element_table_data = dict(junction=dict(inductance=10E-9,
+                                            capacitance=0))
+    """Element table data"""
 
+    name = "palace"
+    """Name"""
 
 
     def __init__(self,
@@ -41,7 +46,7 @@ class QPalaceRenderer(QRendererAnalysis):
             Is renderer ready to be used?
             Implementation must return boolean True if successful. False otherwise.
         """
-        return (hasattr(self, "_palace_runner") and self.gmsh.initialized)
+        return (hasattr(self, "_palace_config") and self.gmsh.initialized)
 
     def initialize_renderer(self):
         """Initializes the Gmsh and Palace renderer.
@@ -59,7 +64,7 @@ class QPalaceRenderer(QRendererAnalysis):
         ```
         """
         self.gmsh = QGmshRenderer(self.design, self.layer_types)
-        self._palace_runner = PalaceRunner()
+        self._palace_config = PalaceConfig()
     
     def _initiate_renderer(self):
         """Initializes the Gmsh and Palace renderer.
@@ -67,7 +72,7 @@ class QPalaceRenderer(QRendererAnalysis):
         specifically imports QPalaceRenderer in a jupyter notebook
         and instantiates it."""
         self.gmsh = QGmshRenderer(self.design, self.layer_types)
-        self._palace_runner = PalaceRunner()
+        self._palace_config = PalaceConfig()
         return True
     
     def _close_renderer(self):
@@ -362,7 +367,7 @@ class QPalaceRenderer(QRendererAnalysis):
         Render the specified component.
 
         Args:
-            component (QComponent): Component to render.
+            component (): Component to render.
         """
         self.gmsh.render_component(component)
 
@@ -430,3 +435,94 @@ class QPalaceRenderer(QRendererAnalysis):
         postprocessing_file = os.path.join(self._options["simulation_dir"],
                                            self._options["postprocessing_file"])
         self.gmsh.import_post_processing_data(postprocessing_file)
+
+    #### Anything below is Palace Config work ####
+
+    def assign_attributes_to_material(self):
+        # Data structure: physical_groups
+        # {ref to layer number (int) : {'name' (str) : attribute number (int)}}
+        physical_groups = self.gmsh.physical_groups
+
+        # Group by materials
+        # Data structure: ls_grouped_by_material
+        # {'material_name' (str) : list of layer ref number associated w/ material (list(int))}
+        ls_grouped_by_material = self.design.ls.ls_df.groupby('material')['layer'].apply(list)
+
+        # Iterate per type of material
+        for material_name, layer_list in ls_grouped_by_material:
+            self.assign_layers_to_material(material_name, layer_list)
+            ###### TODO: Figure out how to assign grounding planes #####
+            self.assign_ground_to_material(material_name, layer_list)
+            
+    def assign_layers_to_material(self, material_name: str, layer_list: list[int]):
+        """
+        Assign layers to material
+
+        Args:
+            material_name (str): Material these layers will be assigned to.
+            layer_list (list(int)): Layers associated w/ material
+
+        """
+        material = PalaceMaterial.find_material_characteristics(material_name=material_name)
+        for layer in layer_list:
+            # Assign polygons to attributes
+            polys = self.gmsh.polys_dict[layer]
+            for poly in polys.values():
+                poly_attribute = poly[0]
+                material.Attributes.append(poly_attribute)
+            
+            # Assign paths to attributes
+            paths = self.gmsh.paths_dict[layer]
+            for path in paths.values():
+                path_attribute = path[0]
+                material.Attributes.append(path_attribute)
+        
+        self._palace_config.assign_material(name=material.Name,
+                                            **material.dict_for_json())
+
+    def assign_ground_to_material(self, material_name: str, layer_list: list[int]):
+        """
+        Assign grounding plane to material
+
+        Args:
+            material_name (str): Material the planes will be assigned to.
+            layer_list (list(int)): Layers associated w/ material
+
+        """
+        pass
+
+    def assign_attributes_to_lumped_port(self):
+        pass
+
+    def generate_config(self, config_path: str = None):
+        """
+        Wrapper for generating config.json for Palace
+
+
+        """
+        self.assign_attributes_to_material()
+        self.assign_attributes_to_lumped_port()
+        
+        if config_path == None:
+            '''TODO: use default path'''
+        self._palace_config.write_config_json(filename=filename,
+                                              sim_dir=sim_dir)
+        pass
+
+    def run_palace(self, 
+                   config_path: str, 
+                   num_procs: int, 
+                   palace_install_path: str):
+        """
+        Execute Palace via subprocess
+
+        Args:
+            config_path (str): Path to config.json file.
+            num_procs (int): Number of MPI processes to use for the simulation.
+            palace_install_path (str): Path to Palace executable.
+        """
+        command = f"{palace_install_path}/bin/palace -np {num_procs} {config_path}"
+        try:
+            subprocess.run(command, shell=True, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error: {e}")

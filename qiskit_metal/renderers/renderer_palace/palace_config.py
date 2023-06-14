@@ -1,15 +1,16 @@
 import json
 import os
 from collections import OrderedDict
+from typing import List, Union
 
 from qiskit_metal import Dict
 from qiskit_metal.renderers.renderer_palace.palace_materials import PalaceMaterial 
 
-class PalaceRunner:
+class PalaceConfig:
     """
     Class for generating the config file (JSON) for simulation settings on Palace.
 
-    Use various properties and methods to change the setup.
+    Use various properties and methods to change the settings.
     Then call self.write_config_json to create the JSON file.  
     """
 
@@ -110,9 +111,9 @@ class PalaceRunner:
     def materials(self):
         return self._materials
 
-    def update_material(self, 
+    def assign_material(self, 
                      name: str, 
-                     attributes: List(int), 
+                     attributes: list[int], 
                      permeability: float, 
                      permittivity: float, 
                      loss_tan: float, 
@@ -143,12 +144,12 @@ class PalaceRunner:
 
 
     ##### self.Boundaries #####
-    def add_pec(self, attributes: List(int)):
+    def add_pec(self, attributes: list[int]):
         """Add a Perfect Electrical Conductor (PEC) boundary condition)"""
         self.Boundaries.setdefault("PEC", {"Attributes": []})["Attributes"] += attributes
     
     def add_conductivity(self, 
-                         attributes: List(int), 
+                         attributes: list[int], 
                          conductivity: float,
                          permeability: float,
                          thickness: float = None):
@@ -156,7 +157,7 @@ class PalaceRunner:
         Add a Conductor boundary condition
         
         Args:
-            attributes (List(int)): Integer array of mesh boundary attributes for this finite conductivity boundary.
+            attributes (list[int]): Integer array of mesh boundary attributes for this finite conductivity boundary.
             conductivity (float): Electrical conductivity for this finite conductivity boundary, S/m.
             permeability (float): Relative permeability for this finite conductivity boundary.
             thickness (float, optional): Conductor thickness for this finite conductivity boundary specified in mesh length units. 
@@ -171,7 +172,7 @@ class PalaceRunner:
 
     def add_lumped_port(self, 
                         index: int,
-                        attributes: List(int),
+                        attributes: list[int],
                         direction: str,
                         excitation: bool,
                         R: float = 0.0,
@@ -183,7 +184,7 @@ class PalaceRunner:
 
         Args:
             Index (int): Index of this lumped port, used in postprocessing output files.
-            Attributes (List(int)): Integer array of mesh boundary attributes for this lumped port boundary. 
+            Attributes (list[int]): Integer array of mesh boundary attributes for this lumped port boundary. 
                             If this port is to be a multielement lumped port with more than a single lumped element, 
                             use the "Elements" array described below.
             Direction (str): Direction to define the polarization direction of the port field mode on this lumped port boundary. 
@@ -219,7 +220,7 @@ class PalaceRunner:
         
         self.Boundaries.setdefault("LumpedPort", []).append(package)
 
-    def add_ground(self, attributes: List(int)):
+    def add_ground(self, attributes: list[int]):
         self.Boundaries.setdefault("Ground", {"Attributes": []})["Attributes"] += attributes
 
     def add_dielectric(self, 
@@ -279,15 +280,16 @@ class PalaceRunner:
 
     ##### self.Solver #####
     def add_eigenmode_solver(self,
-                             target,
-                             tol,
-                             max_its,
-                             N,
-                             save,
-                             solver_type,
-                             contour_target_upper,
-                             contour_aspect_ratio,
-                             contour_n_points):
+                             target: list[int],
+                             tol: float,
+                             max_its: int,
+                             N: int,
+                             save: int,
+                             solver_type: str,
+                             contour_target_upper: float,
+                             contour_aspect_ratio: float,
+                             contour_n_points: float,
+                             order: int):
         """
         Add an eigenmode solver.
 
@@ -305,6 +307,7 @@ class PalaceRunner:
             contour_target_upper (float, optional): Specifies the upper frequency target of the contour used for the FEAST eigenvalue solver, in GHz. This option is relevant only for type: "FEAST".
             contour_aspect_ratio (float, optional): Specifies the aspect ratio of the contour used for the FEAST eigenvalue solver. This should be greater than zero, where the aspect ratio is the ratio of the contour width to the frequency range ("contour_target_upper" - "target"). This option is relevant only for type: "FEAST".
             contour_n_points (int, optional): Number of contour integration points used for the FEAST eigenvalue solver. This option is relevant only for type: "FEAST".
+            order (int): Finite element order (degree). Arbitrary high-order spaces are supported. 
         """
         package = dict(
             Target=target,
@@ -318,7 +321,9 @@ class PalaceRunner:
             ContourAspectRatio=contour_aspect_ratio,
             ContourNPoints=contour_n_points
         )
-        self.Solver.Eigenmode = package
+        self.Solver = dict(Eigenmode=package,
+                           Order=order)
+        self.problem_type = 'Eigenmode'
 
     def create_driven_config(
         min_freq: float,
@@ -329,7 +334,8 @@ class PalaceRunner:
         adaptive_tol: float,
         adaptive_max_samples: int,
         adaptive_max_candidates: int,
-        restart: int) -> dict:
+        restart: int,
+        order: int) -> dict:
         """
         Create a configuration dictionary for the "Driven" simulation type.
 
@@ -343,6 +349,7 @@ class PalaceRunner:
             adaptive_max_samples (int): Maximum number of samples for adaptive sampling.
             adaptive_max_candidates (int): Maximum number of candidates for adaptive sampling.
             restart (int): Number of restarts for the adaptive solver.
+            order (int): Finite element order (degree). Arbitrary high-order spaces are supported.
         """
         package = {
             "MinFreq": min_freq,
@@ -356,7 +363,9 @@ class PalaceRunner:
             "Restart": restart
         }
 
-        self.Problem.Driven = package
+        self.Problem = dict(Driven = package,
+                            Order = order)
+        self.problem_type = 'Driven'
 
 
     ##### Write config to json #####

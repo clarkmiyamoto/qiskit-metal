@@ -1,0 +1,4 @@
+name,permeability,permittivity,loss_tan,conductivity,london_depth,material_axes
+silicon,1.0,11.45,0.0,0.0,0.0,"[[1.0,0.0,0.0], [0.0,1.0,0.0], [0.0,0.0,1.0]]"
+pec,1.0,1.0,0.0,inf,inf,"[[1.0,0.0,0.0], [0.0,1.0,0.0], [0.0,0.0,1.0]]"
+vacuum,1.0,1.0,0.0,0.0,inf,"[[1.0,0.0,0.0], [0.0,1.0,0.0], [0.0,0.0,1.0]]"
