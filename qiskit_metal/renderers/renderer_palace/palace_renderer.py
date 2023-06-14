@@ -19,7 +19,7 @@ class QPalaceRenderer(QRendererAnalysis):
     def __init__(self,
                  design: 'MultiPlanar',
                  layer_types: Union[dict, None] = None,
-                 initiate=True,
+                 initiate: bool = True,
                  options: Dict = None):
         """
         Args:
@@ -28,7 +28,7 @@ class QPalaceRenderer(QRendererAnalysis):
                                                 dict(metal=[...], dielectric=[...]).
                                                 Defaults to None.
             initiate (bool): True to initiate the renderer (Default: False).
-            settings (Dict, optional): Used to override default settings. Defaults to None.
+            options (Dict, optional): Used to override default settings. Defaults to None.
         """
         default_layer_types = dict(metal=[1], dielectric=[3])
         self.layer_types = default_layer_types if layer_types is None else layer_types

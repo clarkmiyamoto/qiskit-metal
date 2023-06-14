@@ -1,9 +1,6 @@
 # Todos 
 Note to self: (remove before pushing to qiskit-community/qiskit-metal (main))
 
-<u>Short-term</u>
-- Add support for `config["Solver"]` in `palace_runner.py`
-
 <u>Long-term</u>
 - Add wrapper to run palace software
 - Auto assign boundary conditions to attributes in the .msh file
